@@ -17,9 +17,9 @@ open "/Applications/Claude.app"  # macOS
 2. Run it whenever starting Claude
 3. See below for permanent fix
 
-## 🚨 Critical Issue
+## 🚨 Critical Issue - UPDATED
 
-Claude Desktop has a severe bug causing MCP (Model Context Protocol) servers to spawn multiple instances and accumulate over time, leading to system instability and functionality breakage.
+Claude Desktop has a severe bug causing MCP (Model Context Protocol) servers to spawn multiple instances and **critically, they accumulate over time because restarts don't kill old processes**.
 
 ## ⚠️ Version Notice
 Last tested with Claude Desktop v0.12.129 (September 2025)
@@ -32,10 +32,11 @@ Check if this issue is fixed in newer versions before applying workarounds.
 
 ## 📊 Problem Description
 
-### The Bug
-1. **Duplication on Launch**: Each MCP server spawns 2 instances instead of 1
-2. **Process Leak on Restart**: Old processes aren't terminated when Claude Desktop restarts
-3. **Exponential Accumulation**: Processes multiply with each restart (2x → 4x → 6x → 8x)
+### The Bug (WORSE than initially documented)
+1. **Duplication on Launch**: Each MCP server spawns 4 instances instead of 1
+2. **⚠️ CRITICAL - Process Accumulation**: **Claude Desktop restart does NOT kill MCP processes**
+3. **Exponential Growth**: 5 MCPs become 20 → 40 → 60+ processes after restarts
+4. **Orphaned Processes**: MCPs continue running even after Claude Desktop closes
 
 ### Impact
 - **Memory Leak**: System memory exhaustion
@@ -69,7 +70,7 @@ bidirectional communication for others.
 
 ### Quick Fix: Process Cleanup Script
 
-Kill all MCP processes before starting Claude Desktop:
+**IMPORTANT**: Must kill MCP processes before restarting Claude Desktop (regular restart doesn't kill them):
 
 ```bash
 #!/bin/bash
@@ -367,24 +368,26 @@ done
 
 ### Expected vs Actual
 
-| Metric | Expected | With Bug | After Fix |
-|--------|----------|----------|-----------|
-| Process Count | N | 2N → 4N → 8N | N |
-| Memory Usage | 100MB per MCP | 400MB+ per MCP | 100MB per MCP |
-| OAuth Success | 100% | 0-50% | 100% |
-| CPU Usage | Normal | High | Normal |
+| Metric | Expected | With Bug (Fresh Start) | After Multiple Restarts |
+|--------|----------|------------------------|-------------------------|
+| Process Count | N | 4N | 8N → 12N → 16N+ |
+| Memory Usage | 100MB per MCP | 400MB per MCP | 800MB+ per MCP |
+| OAuth Success | 100% | 0-50% | 0% (token conflicts) |
+| CPU Usage | Normal | High | Critical |
+| Example: 5 MCPs | 5 processes | 20 processes | 40-60+ processes |
 
 ## 🔬 Testing Findings
 
 ### What We Discovered
 
-During extensive testing of wrapper solutions:
+During extensive testing of wrapper solutions and process behavior:
 
-1. **Race Condition**: Claude Desktop spawns 2-4 instances within microseconds, faster than any PID lock can be established
+1. **Race Condition**: Claude Desktop spawns 4 instances within microseconds, faster than any PID lock can be established
 2. **Communication Protocol**: Claude Desktop requires persistent bidirectional connections with MCPs
 3. **Wrapper Interference**: Universal wrappers that exit on duplicate detection break this communication
 4. **Limited Success**: Wrappers work for OAuth MCPs (like Canva) where authentication is the main issue
-5. **Architecture Issue**: The duplication appears to be intentional or deeply embedded in Claude Desktop's architecture
+5. **⚠️ CRITICAL DISCOVERY**: **Restarting Claude Desktop does NOT terminate MCP processes - they become orphaned and accumulate**
+6. **Process Accumulation**: Each restart adds MORE processes on top of existing ones (not replacing them)
 
 ### Why Universal Wrappers Fail
 
