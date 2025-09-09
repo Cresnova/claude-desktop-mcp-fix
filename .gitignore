@@ -1,0 +1,21 @@
+# Local files not for public repo
+community-posts.md
+PROJECT_LOG.md
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+/tmp/
