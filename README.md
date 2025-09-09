@@ -54,6 +54,17 @@ ps aux | grep -E "mcp" | grep -v grep | wc -l
 # If actual > configured, you're affected
 ```
 
+## ⚠️ Update: Universal Wrapper Limitations
+
+Testing revealed that a universal wrapper solution interferes with Claude Desktop's 
+architecture. The wrapper works for OAuth-based MCPs (like Canva) but breaks 
+bidirectional communication for others.
+
+**Recommended approach:**
+- Use wrapper ONLY for OAuth MCPs experiencing authentication failures
+- For general duplicates, use periodic process cleanup
+- Wait for Anthropic's official fix
+
 ## ✅ Solution
 
 ### Quick Fix: Process Cleanup Script
@@ -75,9 +86,12 @@ pkill -f "npm exec"
 echo "MCP processes cleaned up"
 ```
 
-### Permanent Solution: PID-Lock Wrapper
+### Limited Solution: PID-Lock Wrapper (OAuth MCPs Only)
 
-This universal wrapper ensures only ONE instance of each MCP can run:
+⚠️ **Important**: This wrapper solution only works reliably for OAuth-based MCPs.
+For other MCPs, it may cause communication errors with Claude Desktop.
+
+This wrapper can help with OAuth authentication issues:
 
 ```bash
 #!/bin/bash
@@ -359,6 +373,25 @@ done
 | Memory Usage | 100MB per MCP | 400MB+ per MCP | 100MB per MCP |
 | OAuth Success | 100% | 0-50% | 100% |
 | CPU Usage | Normal | High | Normal |
+
+## 🔬 Testing Findings
+
+### What We Discovered
+
+During extensive testing of wrapper solutions:
+
+1. **Race Condition**: Claude Desktop spawns 2-4 instances within microseconds, faster than any PID lock can be established
+2. **Communication Protocol**: Claude Desktop requires persistent bidirectional connections with MCPs
+3. **Wrapper Interference**: Universal wrappers that exit on duplicate detection break this communication
+4. **Limited Success**: Wrappers work for OAuth MCPs (like Canva) where authentication is the main issue
+5. **Architecture Issue**: The duplication appears to be intentional or deeply embedded in Claude Desktop's architecture
+
+### Why Universal Wrappers Fail
+
+- Claude Desktop expects continuous stdin/stdout streams with each MCP
+- When wrapper detects duplicate and exits, Claude shows connection errors
+- Sleep loops to keep duplicate connections alive also break communication
+- The issue requires fixing at the Electron app level, not wrapper level
 
 ## 🐛 Technical Analysis
 
